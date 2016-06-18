@@ -1,8 +1,8 @@
 /*
 * @Author: Pedro Henrique
 * @Date:   2016-06-11 18:36:22
-* @Last Modified by:   pedro
-* @Last Modified time: 2016-06-12 15:18:29
+* @Last Modified by:   Pedro Henrique
+* @Last Modified time: 2016-06-14 11:03:28
 */
 
 'use strict';
@@ -14,25 +14,52 @@ const MAX_FILE_NAME = 255;
 const MAX_DESCRIPTION_SIZE = 2048;
 
 
+Buffer.prototype.writeUInt64LE = function(data) {
+    this.writeInt32LE(data & -1, 0)
+    this.writeUInt32LE(Math.floor(data / 0x100000000), 4)
+};
+
 var caixa_entry = {
 	name: new Buffer(MAX_FILE_NAME).fill(0),
-	size: new Buffer(64).fill(0),
-	data: new Buffer(1).fill(0)
+	size: new Buffer(8).fill(0),
+	data: "", 
+    create: function(name, size, data) {
+        this.name.write(name);
+        this.size.writeUInt32LE(size);
+        this.data = data;
+
+        return this;
+    }, 
+    getBuffer: function() {
+        return this.name + this.size + this.data;
+    }
 };
 
 var caixa_header = {
 	name: new Buffer(MAX_FILE_NAME).fill(0),
 	version: new Buffer(10).fill(0),
 	description: new Buffer(MAX_DESCRIPTION_SIZE).fill(0),
-	number_files: new Buffer(32).fill(0),
-	created_on: new Buffer(64).fill(0),
-	updated_on: new Buffer(64).fill(0)
+	number_files: new Buffer(4).fill(0),
+	created_on: new Buffer(8).fill(0),
+	updated_on: new Buffer(8).fill(0),
+    getBuffer: function() {
+        return this.name + this.version + this.description + this.number_files 
+                + this.created_on + this.updated_on;
+    }
 };
-
 
 var caixa_file = {
 	header: caixa_header,
-	files: [ caixa_entry ]
+	files: [],
+    getBuffer: function() {
+        var files= "";
+
+        for(var index = 0; index < this.files.length; index++) {
+            files = files + this.files[index].getBuffer();
+        }
+
+        return this.header.getBuffer() +  files;
+    }
 };
 
 
@@ -41,37 +68,22 @@ function time() {
 }
 
 
-const MAX_UINT32 = 0xFFFFFFFF
-
-
-
-
-
-
-// b.writeUInt32BE(big, 0)  // 00 00 01 53 00 00 00 00
-// b.writeUInt32BE(low, 4)  // 00 00 01 53 36 9a 06 58
-
 
 caixa_header.name.write("Internal name of the caixa file");
 caixa_header.version.write(VERSION);
-caixa_header.description.write("The Description of the caixa file");
-caixa_header.number_files.writeUInt32BE(1);
+caixa_header.description.write("The Description of the caixa file", 0, MAX_DESCRIPTION_SIZE);
+caixa_header.number_files.writeUInt32LE(1);
+caixa_header.created_on.writeUInt64LE(time());
+caixa_header.updated_on.writeUInt64LE(time());
 
 
-var big = ~~(time() / MAX_UINT32)
-var low = (time() % MAX_UINT32) - big
-caixa_header.created_on.writeUInt32BE(big, 0);
-caixa_header.created_on.writeUInt32BE(low, 4);
+var test = fs.readFileSync("test.txt");
 
-var big = ~~(time() / MAX_UINT32)
-var low = (time() % MAX_UINT32) - big
-caixa_header.updated_on.writeUInt32BE(big, 0);
-caixa_header.updated_on.writeUInt32BE(low, 4);
+var fileEntry = caixa_entry.create("test.txt", test.length, test);
+caixa_file.files.push(fileEntry);
 
 
-var output = caixa_header.name + caixa_header.version +
-caixa_header.description + caixa_header.number_files + 
-caixa_header.created_on + caixa_header.updated_on;
+var output = caixa_file.getBuffer();
 
 fs.open("teste2.caixa", 'w', function(err, fd) {
     if (err) {
@@ -84,52 +96,5 @@ fs.open("teste2.caixa", 'w', function(err, fd) {
             console.log('file written');
         })
     });
-
-    // pos_offset += caixa_header.name.length;
-
-    // fs.write(fd, caixa_header.version, pos_offset, caixa_header.version.length, null, function(err) {
-    //     if (err) throw 'error writing file: ' + err;
-    //     fs.close(fd, function() {
-    //         console.log('file written');
-    //     })
-    // });
-
-    // pos_offset += caixa_header.version.length;
-
-    // fs.write(fd, caixa_header.description, pos_offset, caixa_header.description.length, null, function(err) {
-    //     if (err) throw 'error writing file: ' + err;
-    //     fs.close(fd, function() {
-    //         console.log('file written');
-    //     })
-    // });
-
-    // pos_offset += caixa_header.description.length;
-
-    // fs.write(fd, caixa_header.number_files, pos_offset, caixa_header.number_files.length, null, function(err) {
-    //     if (err) throw 'error writing file: ' + err;
-    //     fs.close(fd, function() {
-    //         console.log('file written');
-    //     })
-    // });
-
-    // pos_offset += caixa_header.number_files.length;
-
-    // fs.write(fd, caixa_header.created_on, pos_offset, caixa_header.created_on.length, null, function(err) {
-    //     if (err) throw 'error writing file: ' + err;
-    //     fs.close(fd, function() {
-    //         console.log('file written');
-    //     })
-    // });
-
-    // pos_offset += caixa_header.created_on.length;
-
-    // fs.write(fd, caixa_header.updated_on, pos_offset, caixa_header.updated_on.length, null, function(err) {
-    //     if (err) throw 'error writing file: ' + err;
-    //     fs.close(fd, function() {
-    //         console.log('file written');
-    //     })
-    // });
-
-    // pos_offset += caixa_header.updated_on.length;
 
 });

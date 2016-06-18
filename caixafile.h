@@ -134,8 +134,12 @@ int caixa_write_to_file(caixa_file *caixa, char *file_name) {
 
 	caixa->header.updated_on = (uint64_t) time(0);
 
-	fwrite((void*)&caixa->header, sizeof(caixa_header), 1, file);
-
+	fwrite(caixa->header.name, 1, MAX_FILE_NAME, file);
+	fwrite(caixa->header.version, 1, 10, file);
+	fwrite(caixa->header.description, 1, MAX_DESCRIPTION_SIZE, file);
+	fwrite((void*)&caixa->header.number_files, 1, sizeof(uint32_t), file);
+	fwrite((void*)&caixa->header.created_on, 1, sizeof(uint64_t), file);
+	fwrite((void*)&caixa->header.updated_on, 1, sizeof(uint64_t), file);
 
 	for(uint32_t index = 0; index < caixa->header.number_files; index++) {
 		fwrite((void*)caixa->files[index], sizeof(caixa_entry), 1, file);
